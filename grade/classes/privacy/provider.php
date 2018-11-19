@@ -205,18 +205,24 @@ class provider implements
         $contextlist->add_from_sql($sql, $params);
 
         // Add where we were graded or modified grades, including in the history table.
-        // MDL-64027 - Change query to avoid inefficient LEFT JOIN
         $sql = "
-             SELECT DISTINCT ctx.id
-               FROM {grade_items} gi
-               JOIN {context} ctx
-               ON ctx.instanceid = gi.courseid
+            SELECT DISTINCT ctx.id
+              FROM {grade_items} gi
+              JOIN {context} ctx
+                ON ctx.instanceid = gi.courseid
                AND ctx.contextlevel = :courselevel
-             JOIN (
-                 SELECT a.id, a.itemid FROM {grade_grades} a WHERE a.userid = :userid1 OR a.usermodified = :userid2
-                 UNION
-                 SELECT b.id, b.itemid FROM {grade_grades_history} b WHERE b.userid = :userid3 OR b.loggeduser = :userid4 OR b.usermodified = :userid5
-             ) gg ON gi.id = gg.itemid";
+         LEFT JOIN {grade_grades} gg
+                ON gg.itemid = gi.id
+               AND (gg.userid = :userid1 OR gg.usermodified = :userid2)
+         LEFT JOIN {grade_grades_history} ggh
+                ON ggh.itemid = gi.id
+               AND (
+                   ggh.userid = :userid3
+                OR ggh.loggeduser = :userid4
+                OR ggh.usermodified = :userid5
+            )
+             WHERE gg.id IS NOT NULL
+                OR ggh.id IS NOT NULL";
         $params = [
             'courselevel' => CONTEXT_COURSE,
             'userid1' => $userid,
